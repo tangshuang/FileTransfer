@@ -1,15 +1,15 @@
 import styles from "./index.module.scss";
 import { FC, useLayoutEffect, useRef, useState } from "react";
-import { IconGithub } from "@arco-design/web-react/icon";
 import { BoardCastIcon, ComputerIcon, PhoneIcon } from "./icon";
 import { useMemoizedFn } from "../hooks/use-memoized-fn";
-import { WebRTC } from "../core/webrtc";
+import { WebRTC, NAME_KEY } from "../core/webrtc";
 import { WebRTCApi } from "../../types/webrtc";
 import { SERVER_EVENT, ServerFn } from "../../types/signaling";
 import { CONNECTION_STATE, DEVICE_TYPE, Member } from "../../types/client";
 import { TransferModal } from "./modal";
 import { Message } from "@arco-design/web-react";
 import { ERROR_TYPE } from "../../types/server";
+import { TSON } from "../utils/tson";
 
 export const App: FC = () => {
   const rtc = useRef<WebRTCApi | null>(null);
@@ -19,12 +19,34 @@ export const App: FC = () => {
   const [visible, setVisible] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [state, setState] = useState(CONNECTION_STATE.INIT);
+  const [nickname, setNickname] = useState(sessionStorage?.getItem(NAME_KEY) || "");
+
+  // 发送身份信息
+  const sendIdentify = () => {
+    if (!connection.current) {
+      return;
+    }
+
+    if (connection.current?.id === connection.current?.name) {
+      return;
+    }
+
+    console.log("Send Identify:", connection.current.id, connection.current.name);
+    rtc.current?.send(
+      TSON.encode({
+        type: "identity",
+        id: connection.current.id,
+        name: connection.current.name,
+      })
+    );
+  };
 
   // === RTC Connection Event ===
   const onOpen = useMemoizedFn(event => {
     console.log("OnOpen", event);
     setVisible(true);
     setState(CONNECTION_STATE.CONNECTED);
+    sendIdentify();
   });
   const onClose = useMemoizedFn((event: Event) => {
     console.log("OnClose", event);
@@ -122,11 +144,52 @@ export const App: FC = () => {
     setVisible(true);
   };
 
+  const onNicknameChange = (nickname: string) => {
+    setNickname(nickname);
+  };
+
+  const onNicknameOK = () => {
+    sessionStorage?.setItem(NAME_KEY, nickname);
+
+    if (!connection.current) {
+      return;
+    }
+
+    connection.current.name = nickname;
+
+    // 为打开窗口的情况下，无需发送
+    if (!visible) {
+      return;
+    }
+
+    // 状态为未连接时，也不发送
+    if (state !== CONNECTION_STATE.CONNECTED) {
+      return;
+    }
+
+    sendIdentify();
+  };
+
+  const onNicknameKeyup = (code: string) => {
+    if (code === "Enter") {
+      onNicknameOK();
+    }
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.content}>
         <div className={styles.boardCastIcon}>{BoardCastIcon}</div>
         <div>Local ID: {id}</div>
+        <div>
+          Nickname:
+          <input
+            value={nickname}
+            onChange={e => onNicknameChange(e.target.value)}
+            onKeyUp={e => onNicknameKeyup(e.code)}
+            onBlur={onNicknameOK}
+          />
+        </div>
         <div className={styles.manualEntry} onClick={onManualRequest}>
           Request To Establish P2P Connection By ID
         </div>
@@ -144,13 +207,6 @@ export const App: FC = () => {
           </div>
         ))}
       </div>
-      <a
-        className={styles.github}
-        href="https://github.com/WindrunnerMax/FileTransfer"
-        target="_blank"
-      >
-        <IconGithub />
-      </a>
       {visible && (
         <TransferModal
           connection={connection}

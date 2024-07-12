@@ -1,7 +1,10 @@
 import type { WebRTCInstance } from "../client/core/instance";
 import type { SignalingServer } from "../client/core/signaling";
 
-export type WebRTCOptions = { wss: string; ice?: string };
+export type WebRTCOptions = {
+  wss: string;
+  ice?: string;
+};
 export type WebRTCApi = {
   connect: (id: string) => void;
   send: (message: string | ArrayBuffer) => void;

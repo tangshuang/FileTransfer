@@ -16,7 +16,8 @@ export type TextMessageType =
   | { type: "text"; data: string }
   | { type: "file-finish"; id: string }
   | ({ type: "file-start"; name: string } & FileType)
-  | ({ type: "file-next"; series: number } & FileType);
+  | ({ type: "file-next"; series: number } & FileType)
+  | { type: "identity"; id: string; name: string };
 
 export type TransferListItem =
   | { type: "text"; data: string; from: "self" | "peer" }

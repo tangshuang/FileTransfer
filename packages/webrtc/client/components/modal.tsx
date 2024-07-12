@@ -21,6 +21,8 @@ import {
   sendChunkMessage,
 } from "../utils/binary";
 
+const history: { [peerId: string]: TransferListItem[] } = {};
+
 export const TransferModal: FC<{
   connection: React.MutableRefObject<WebRTC | null>;
   rtc: React.MutableRefObject<WebRTCApi | null>;
@@ -36,7 +38,13 @@ export const TransferModal: FC<{
   const listRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState("");
   const [toConnectId, setToConnectId] = useState("");
-  const [list, setList] = useState<TransferListItem[]>([]);
+  const [list, _setList] = useState<TransferListItem[]>(history[peerId] || []);
+  const [peerName, setPeerName] = useState("");
+
+  const setList = (newList: TransferListItem[]) => {
+    _setList(newList);
+    history[peerId] = newList;
+  };
 
   const onCancel = () => {
     rtc.current?.close();
@@ -79,6 +87,12 @@ export const TransferModal: FC<{
         const { id } = data;
         FILE_STATE.delete(id);
         updateFileProgress(id, 100);
+      } else if (data.type === "identity") {
+        const { id, name } = data;
+        if (id !== peerId) {
+          console.error(`identity not match id: ${id}!=${peerId}`);
+        }
+        setPeerName(name);
       }
     } else {
       // `Binary`
@@ -221,11 +235,11 @@ export const TransferModal: FC<{
           ></div>
           {peerId
             ? state === CONNECTION_STATE.READY
-              ? "Disconnected: " + peerId
+              ? "Disconnected: " + (peerName ? `${peerName}(${peerId})` : peerId)
               : state === CONNECTION_STATE.CONNECTING
               ? "Connecting: " + peerId
               : state === CONNECTION_STATE.CONNECTED
-              ? "Connected: " + peerId
+              ? "Connected: " + (peerName ? `${peerName}(${peerId})` : peerId)
               : "Unknown State: " + peerId
             : "Please Establish Connection"}
         </div>
@@ -235,6 +249,10 @@ export const TransferModal: FC<{
       onCancel={onCancel}
       maskClosable={false}
     >
+      <div className={styles.modalRoles}>
+        <span>{peerName || "There"}</span>
+        <span>Me</span>
+      </div>
       <div className={styles.modalContent} ref={listRef}>
         {list.map((item, index) => (
           <div
